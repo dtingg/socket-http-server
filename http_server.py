@@ -1,11 +1,18 @@
+"""
+HTTP Server
+"""
+
 import socket
 import sys
 import traceback
+import os
+import mimetypes
 
 
 def response_ok(body=b"This is a minimal response", mimetype=b"text/plain"):
     """
     returns a basic HTTP response
+
     Ex:
         response_ok(
             b"<html><h1>Welcome:</h1></html>",
@@ -44,7 +51,11 @@ def response_not_found():
     """Returns a 404 Not Found response"""
 
     # Implement response_not_found
-    return b""
+    return b"\r\n".join([
+        b"HTTP/1.1 404 Not Found",
+        b"",
+        b"Could not find resource on this server."
+    ])
 
 
 def parse_request(request):
@@ -56,14 +67,12 @@ def parse_request(request):
     """
 
     # implement parse_request
-
     method, path, version = request.split("\r\n")[0].split(" ")
 
     if method != "GET":
         raise NotImplementedError
 
     return path
-
 
 
 def response_path(path):
@@ -91,22 +100,47 @@ def response_path(path):
                              b"text/plain")
 
         response_path('/a_page_that_doesnt_exist.html') -> Raises a NameError
-
     """
 
-    # TODO: Raise a NameError if the requested content is not present
-    # under webroot.
-
-    # TODO: Fill in the appropriate content and mime_type give the path.
+    # Fill in the appropriate content and mime_type give the path.
     # See the assignment guidelines for help on "mapping mime-types", though
     # you might need to create a special case for handling make_time.py
-    #
+
     # If the path is "make_time.py", then you may OPTIONALLY return the
     # result of executing `make_time.py`. But you need only return the
     # CONTENTS of `make_time.py`.
 
-    content = b"not implemented"
-    mime_type = b"not implemented"
+    home_dir = os.getcwd() + "\\webroot"
+
+    try:
+
+        # If it is a directory, content is a plain text listing of the contents with mimetype "text/plain"
+        if path == "/":
+
+            location = home_dir + "\\"
+
+            listing = [item for item in os.listdir(location)]
+
+            content = "\r\n".join(listing).encode("utf-8")
+
+            mime_type = b"text/plain"
+
+        # If it is a file, return the contents of that file and its correct mimetype
+        else:
+            location = home_dir + str(path)
+
+            print(location)
+
+            content = b"filestuff"
+
+            mime_type = mimetypes.guess_type(path)[0]
+
+            mime_type = mime_type.encode("utf-8")
+
+        # Raise a NameError if the requested content is not present under webroot.
+        # Catch exception and raise 404 error
+    except NameError:
+        return response_not_found()
 
     return content, mime_type
 
@@ -123,10 +157,12 @@ def server(log_buffer=sys.stderr):
         while True:
             print('waiting for a connection', file=log_buffer)
             conn, addr = sock.accept()  # blocking
+
             try:
                 print('connection - {0}:{1}'.format(*addr), file=log_buffer)
 
                 request = ''
+
                 while True:
                     data = conn.recv(1024)
                     request += data.decode('utf8')
@@ -140,30 +176,33 @@ def server(log_buffer=sys.stderr):
                 try:
                     path = parse_request(request)
 
-                    # TODO: Use response_path to retrieve the content and the mimetype,
-                    # based on the request path.
-
-                    # TODO; If parse_request raised a NotImplementedError, then let
-                    # response be a method_not_allowed response. If response_path raised
-                    # a NameError, then let response be a not_found response. Else,
-                    # use the content and mimetype from response_path to build a
-                    # response_ok.
-                    response = response_ok(
-                        body=b"Welcome to my web server",
-                        mimetype=b"text/plain"
-                    )
+                # If parse_request raised NotImplementedError, response = method_not_allowed response
                 except NotImplementedError:
-                    response = response_method_not_allowed()
+                    return response_method_not_allowed()
+
+                # Use response_path to retrieve the content and the mimetype, based on the request path.
+                try:
+                    content, mimetype = response_path(path)
+
+                # If response_path raised NameError, let response be not_found response
+                except NameError:
+                    return response_not_found()
+
+                # Use content and mimetype from response_path to build a response_ok
+                response = response_ok(body=content, mimetype=mimetype)
 
                 conn.sendall(response)
+
             except:
                 traceback.print_exc()
+
             finally:
                 conn.close()
 
     except KeyboardInterrupt:
         sock.close()
         return
+
     except:
         traceback.print_exc()
 

@@ -110,39 +110,34 @@ def response_path(path):
     # result of executing `make_time.py`. But you need only return the
     # CONTENTS of `make_time.py`.
 
-    home_dir = os.getcwd() + "\\webroot"
+    home_dir = os.path.abspath("webroot")
 
-    try:
+    # If it is a directory, content is a plain text listing of the contents with mimetype "text/plain"
+    if path == "/":
 
-        # If it is a directory, content is a plain text listing of the contents with mimetype "text/plain"
-        if path == "/":
+        listing = [item for item in os.listdir(home_dir)]
 
-            location = home_dir + "\\"
+        content = "\r\n".join(listing).encode("utf-8")
 
-            listing = [item for item in os.listdir(location)]
+        mimetype = b"text/plain"
 
-            content = "\r\n".join(listing).encode("utf-8")
+    # If it is a file, return the contents of that file and its correct mimetype
+    else:
+        location = os.path.join(home_dir, path[1:])
 
-            mime_type = b"text/plain"
+        with open(location, "rb") as file:
+            content = file.read()
 
-        # If it is a file, return the contents of that file and its correct mimetype
-        else:
-            location = home_dir + str(path)
+        file_type = mimetypes.guess_type(path)[0]
 
-            print(location)
-
-            content = b"filestuff"
-
-            mime_type = mimetypes.guess_type(path)[0]
-
-            mime_type = mime_type.encode("utf-8")
+        mimetype = file_type.encode("utf-8")
 
         # Raise a NameError if the requested content is not present under webroot.
         # Catch exception and raise 404 error
-    except NameError:
-        return response_not_found()
+        # except FileNotFoundError as NameError:
+        # return response_not_found()
 
-    return content, mime_type
+    return content, mimetype
 
 
 def server(log_buffer=sys.stderr):
@@ -185,8 +180,9 @@ def server(log_buffer=sys.stderr):
                     content, mimetype = response_path(path)
 
                 # If response_path raised NameError, let response be not_found response
-                except NameError:
-                    return response_not_found()
+                except FileNotFoundError:
+                    content = response_not_found()
+                    mimetype = b"text/plain"
 
                 # Use content and mimetype from response_path to build a response_ok
                 response = response_ok(body=content, mimetype=mimetype)

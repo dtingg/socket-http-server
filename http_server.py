@@ -128,6 +128,7 @@ def response_path(path):
 
 
 def server(log_buffer=sys.stderr):
+    """Sets up server"""
     address = ('127.0.0.1', 10000)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

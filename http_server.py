@@ -7,6 +7,7 @@ import sys
 import traceback
 import os
 import mimetypes
+import subprocess
 
 
 def response_ok(body=b"This is a minimal response", mimetype=b"text/plain"):
@@ -103,8 +104,15 @@ def response_path(path):
     location = os.path.join(home_dir, path[1:])
 
     try:
+        # Check if it is a python script
+        if path.endswith(".py"):
+            results = subprocess.run(["python", location], capture_output=True)
+
+            content = results.stdout
+            mimetype = b"text/html"
+
         # If it is a directory, content is a plain text listing of the files with mimetype "text/plain"
-        if os.path.isdir(location):
+        elif os.path.isdir(location):
             listing = [item for item in os.listdir(location)]
 
             content = "\r\n".join(listing).encode("utf-8")
@@ -174,6 +182,9 @@ def server(log_buffer=sys.stderr):
                     response = response_not_found()
 
                 conn.sendall(response)
+
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt
 
             except:
                 traceback.print_exc()
